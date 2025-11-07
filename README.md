@@ -58,8 +58,6 @@ It helps teams form, communicate, generate AI-powered pitch content, track deadl
 
 ### Project Status  
 ![Ongoing](https://img.shields.io/badge/Project-Ongoing-yellow?style=for-the-badge)  
-![Contributions Welcome](https://img.shields.io/badge/Contributions-Welcome-blue?style=for-the-badge)
-
 ---
 
 **Teamify.AI - Build faster. Collaborate smarter.**
