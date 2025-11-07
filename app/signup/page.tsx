@@ -19,7 +19,7 @@ export default function SignUp() {
 
     setTimeout(() => {
       toast.success("Account created! Welcome aboard!");
-      router.push("/team");
+      router.push("/team/choose");
       setIsLoading(false);
     }, 1500);
   };
