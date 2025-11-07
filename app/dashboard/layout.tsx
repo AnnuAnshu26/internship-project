@@ -10,7 +10,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       <Sidebar />
 
       {/* Page changes here */}
-      <div className="flex-1 ml-0">
+      <div className="flex-1 ml-0 md:ml-64">
         {children}
       </div>
     </div>

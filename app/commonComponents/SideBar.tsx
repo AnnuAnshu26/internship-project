@@ -14,6 +14,7 @@ import {
   Menu,
   X,
   Zap,
+  User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -33,33 +34,29 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* Mobile Menu Toggle */}
-      <div className="lg:hidden flex items-center justify-between p-4 bg-[#0a0f1a] border-b border-white/10">
+      {/* Mobile Topbar + Toggle Button */}
+      <div className="lg:hidden flex items-center justify-between p-4 bg-[#0a0f1a] border-b border-white/10 fixed top-0 left-0 w-full z-50">
         <div className="flex items-center gap-2">
           <div className="w-9 h-9 bg-gradient-to-r from-[#5b47ff] to-[#9b59ff] rounded-xl flex items-center justify-center">
             <Zap className="w-5 h-5 text-white" />
           </div>
-          <span className="text-white font-semibold text-lg">HackCollab</span>
+          <span className="text-white font-semibold text-lg">Teamify.AI</span>
         </div>
+
         <button onClick={() => setOpen(!open)}>
-          {open ? (
-            <X className="w-6 h-6 text-white" />
-          ) : (
-            <Menu className="w-6 h-6 text-white" />
-          )}
+          {open ? <X className="w-6 h-6 text-white" /> : <Menu className="w-6 h-6 text-white" />}
         </button>
       </div>
 
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed lg:static top-0 left-0 min-h-screen w-64 bg-[#0a0f1a] border-r border-white/10 flex flex-col transition-transform duration-300 z-50",
+          "fixed top-0 left-0 h-screen w-64 bg-[#0a0f1a] border-r border-white/10 flex flex-col z-50 transition-transform duration-300",
           open ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         )}
       >
-
         {/* Logo */}
-        <div className="flex items-center gap-2 px-6 py-6">
+        <div className="flex items-center gap-2 px-6 py-6 mt-2">
           <div className="w-10 h-10 bg-gradient-to-r from-[#5b47ff] to-[#9b59ff] rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/30">
             <Zap className="w-6 h-6 text-white" />
           </div>
@@ -67,13 +64,14 @@ export default function Sidebar() {
         </div>
 
         {/* Nav Links */}
-        <nav className="flex-1 px-4 space-y-2 mt-2 overflow-y-auto scrollbar-thin scrollbar-thumb-[#5b47ff] scrollbar-track-transparent">
+        <nav className="flex-1 px-4 space-y-2 overflow-y-auto">
           {links.map(({ name, href, icon: Icon }) => {
             const active = pathname === href;
             return (
               <Link
                 key={name}
                 href={href}
+                onClick={() => setOpen(false)}
                 className={cn(
                   "flex items-center gap-2 px-4 py-2 rounded-lg text-gray-400 transition-all",
                   active
@@ -81,35 +79,25 @@ export default function Sidebar() {
                     : "hover:bg-[#111827]/50 hover:text-white"
                 )}
               >
-                <Icon
-                  className={cn(
-                    "w-5 h-5",
-                    active ? "text-[#9b59ff]" : "text-gray-400"
-                  )}
-                />
+                <Icon className={cn("w-5 h-5", active ? "text-[#9b59ff]" : "text-gray-400")} />
                 <span className="font-medium">{name}</span>
               </Link>
             );
           })}
         </nav>
 
-        {/* Settings (Bottom) */}
+        {/* Bottom Settings */}
         <div className="px-4 py-2 border-t border-white/10">
           <Link
             href="/settings"
+            onClick={() => setOpen(false)}
             className={cn(
               "flex items-center gap-3 px-4 py-2.5 rounded-lg text-gray-400 hover:text-white hover:bg-[#111827]/50 transition-all",
-              pathname === "/settings" &&
-              "bg-[#111827] text-white shadow-lg shadow-indigo-500/20"
+              pathname === "/settings" && "bg-[#111827] text-white"
             )}
           >
-            <Settings
-              className={cn(
-                "w-5 h-5",
-                pathname === "/settings" ? "text-[#9b59ff]" : "text-gray-400"
-              )}
-            />
-            <span className="font-medium">Settings</span>
+            <User className="w-5 h-5" />
+            <span className="font-medium">Anushka Aggarwal</span>
           </Link>
         </div>
       </aside>
