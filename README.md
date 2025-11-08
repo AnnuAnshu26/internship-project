@@ -52,7 +52,7 @@ It helps teams form, communicate, generate AI-powered pitch content, track deadl
 ---
 
 ## Setup & Installation  
-> Instructions will be added soon as the project is actively in development.
+> Steps will be added soon as the project is actively in development.
 
 ---
 

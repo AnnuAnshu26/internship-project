@@ -4,30 +4,68 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowRight, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 export default function JoinTeamPage() {
   const router = useRouter();
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleJoin = () => {
-    if (!code.trim()) return;
+  const handleJoin = async () => {
+    if (!code.trim()) {
+      toast.error("Please enter a team code");
+      return;
+    }
+
+    const token = localStorage.getItem("token");
+    if (!token) {
+      toast.error("Please login first");
+      router.push("/signin");
+      return;
+    }
+
     setLoading(true);
 
-    setTimeout(() => {
-      router.push("/dashboard");
-    }, 1500);
+    try {
+      const res = await fetch("http://localhost:5000/api/team/join", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify({ teamCode: code.toUpperCase() }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Invalid Team Code");
+      }
+
+      toast.success("Team joined successfully!");
+
+// ✅ Save both Mongo _id and teamCode
+
+localStorage.setItem("teamId", data.team._id);
+localStorage.setItem("teamCode", data.team.teamCode);
+
+router.push("/dashboard");
+
+
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="min-h-screen bg-[#0a0f1a] flex items-center justify-center px-4 sm:px-6">
-      
       <motion.div
         initial={{ opacity: 0, y: 18 }}
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-sm sm:max-w-md bg-[#101626]/60 backdrop-blur-md border border-white/10 rounded-2xl p-6 sm:p-8 text-white shadow-lg"
       >
-
         <h1 className="text-white text-2xl sm:text-5xl font-bold text-center bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
           Join Team
         </h1>
@@ -52,12 +90,10 @@ export default function JoinTeamPage() {
             disabled={loading}
             className="w-full bg-gradient-to-r from-blue-600 to-purple-600 py-3 rounded-xl flex justify-center items-center gap-2 font-medium hover:scale-[1.02] transition"
           >
-            {loading ? <Loader2 className="animate-spin" size={20}/> : <ArrowRight size={20} />}
+            {loading ? <Loader2 className="animate-spin" size={20} /> : <ArrowRight size={20} />}
             {loading ? "Joining..." : "Join Team"}
           </button>
-
         </div>
-
       </motion.div>
     </div>
   );

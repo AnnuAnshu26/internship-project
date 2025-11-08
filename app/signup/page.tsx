@@ -11,17 +11,47 @@ import { toast } from "sonner";
 
 export default function SignUp() {
   const router = useRouter();
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    password: ""
+  });
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
 
-    setTimeout(() => {
-      toast.success("Account created! Welcome aboard!");
+
+    try {
+      const res = await fetch("http://localhost:5000/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+
+      const data = await res.json();
+      console.log("Response status:", res.status);
+      console.log("Response data:", data);
+      console.log("Token saved ✅", data.token);
+
+
+      if (!res.ok) {
+        toast.error(data.message || "Signup failed");
+        setIsLoading(false);
+        return;
+      }
+
+      // ✅ Save token and redirect
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("userName", data.user.name);
+      toast.success("Account created! Welcome aboard 🚀");
       router.push("/team/choose");
-      setIsLoading(false);
-    }, 1500);
+
+    } catch (error) {
+      toast.error("Something went wrong!");
+    }
+    setIsLoading(false);
   };
 
   return (
@@ -75,8 +105,11 @@ export default function SignUp() {
               type="text"
               placeholder="John Doe"
               required
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
               className="bg-black/40 border border-white/10 text-white placeholder:text-gray-500 focus-visible:ring-[#8b5cff]"
             />
+
           </div>
 
           <div className="space-y-2">
@@ -88,8 +121,11 @@ export default function SignUp() {
               type="email"
               placeholder="your@email.com"
               required
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
               className="bg-black/40 border border-white/10 text-white placeholder:text-gray-500 focus-visible:ring-[#8b5cff]"
             />
+
           </div>
 
           <div className="space-y-2">
@@ -101,8 +137,11 @@ export default function SignUp() {
               type="password"
               placeholder="••••••••"
               required
+              value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
               className="bg-black/40 border border-white/10 text-white placeholder:text-gray-500 focus-visible:ring-[#8b5cff]"
             />
+
           </div>
 
           {/* <div className="space-y-2">

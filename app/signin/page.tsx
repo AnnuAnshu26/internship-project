@@ -13,16 +13,43 @@ export default function SignIn() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
 
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+  });
+
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
 
-    // simulate login
-    setTimeout(() => {
-      toast.success("Welcome back!");
-      router.push("/team"); // redirect after login
+    try {
+      const res = await fetch("http://localhost:5000/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Login failed");
+      }
+
+      // ✅ Save token & user data
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("user", JSON.stringify(data.user));
+      localStorage.setItem("userName", data.user.name);
+
+      toast.success("Welcome back " + data.user.name + " 🚀");
+
+      // ✅ Redirect to dashboard or team page
+      router.push("/dashboard");
+
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   return (
@@ -77,6 +104,8 @@ export default function SignIn() {
               type="email"
               placeholder="you@example.com"
               required
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               className="bg-black/40 border border-white/10 text-white placeholder:text-gray-500 focus-visible:ring-[#8b5cff]"
             />
           </div>
@@ -90,6 +119,8 @@ export default function SignIn() {
               type="password"
               placeholder="••••••••"
               required
+              value={formData.password}
+              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
               className="bg-black/40 border border-white/10 text-white placeholder:text-gray-500 focus-visible:ring-[#8b5cff]"
             />
           </div>

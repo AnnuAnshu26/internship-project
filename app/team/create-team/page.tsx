@@ -3,30 +3,60 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Loader2, Plus, Check, Copy } from "lucide-react";
+import { toast } from "sonner";
 
 export default function CreateTeamPage() {
     const [teamName, setTeamName] = useState("");
     const [loading, setLoading] = useState(false);
-    const [teamCode, setTeamCode] = useState<string | null>(null);
+    const [teamId, setTeamId] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
 
-    const generateCode = () => {
-        return "TEAM-" + Math.random().toString(36).substring(2, 8).toUpperCase();
-    };
+    const handleCreateTeam = async () => {
+        if (!teamName.trim()) {
+            toast.error("Team name is required");
+            return;
+        }
 
-    const handleCreateTeam = () => {
-        if (!teamName.trim()) return;
+        const token = localStorage.getItem("token");
+        if (!token) {
+            toast.error("Please login first");
+            return;
+        }
+
         setLoading(true);
 
-        setTimeout(() => {
-            setTeamCode(generateCode());
+        try {
+            const res = await fetch("http://localhost:5000/api/team/create", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`,
+                },
+                body: JSON.stringify({ name: teamName }),
+            });
+
+            const data = await res.json();
+            console.log("API response:", data);
+
+            if (!res.ok) {
+                throw new Error(data.message || "Failed to create team");
+            }
+
+setTeamId(data.team._id); // ✅ Mongo ID save karo
+localStorage.setItem("teamId", data.team._id);
+localStorage.setItem("teamCode", data.team.teamCode);
+
+            toast.success("Team created successfully!");
+        } catch (error: any) {
+            toast.error(error.message);
+        } finally {
             setLoading(false);
-        }, 1400);
+        }
     };
 
     const handleCopy = () => {
-        if (!teamCode) return;
-        navigator.clipboard.writeText(teamCode);
+        if (!teamId) return;
+        navigator.clipboard.writeText(teamId);
         setCopied(true);
         setTimeout(() => setCopied(false), 1500);
     };
@@ -39,7 +69,7 @@ export default function CreateTeamPage() {
                 className="w-full max-w-sm sm:max-w-md bg-[#101626]/60 backdrop-blur-lg border border-white/10 rounded-2xl p-6 sm:p-8 text-white shadow-lg"
             >
 
-                {!teamCode ? (
+                {!teamId ? (
                     /* ---- TEAM CREATION FORM ---- */
                     <>
                         <h1 className="text-3xl font-bold text-center bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
@@ -88,19 +118,9 @@ export default function CreateTeamPage() {
 
                         {/* CODE BOX */}
                         <div className="mt-6 flex items-center justify-between bg-[#0c111c] border border-white/10 px-4 py-3 rounded-lg">
-                            <span className="font-mono text-lg tracking-wide">
-                                {teamCode}
-                            </span>
-
-                            <button
-                                onClick={handleCopy}
-                                className="p-2 hover:bg-white/10 rounded-md transition"
-                            >
-                                {copied ? (
-                                    <Check className="text-green-400" size={20} />
-                                ) : (
-                                    <Copy size={20} />
-                                )}
+                            <span className="font-mono text-lg tracking-wide">{teamId}</span>
+                            <button onClick={handleCopy} className="p-2 hover:bg-white/10 rounded-md transition">
+                                {copied ? <Check className="text-green-400" size={20} /> : <Copy size={20} />}
                             </button>
                         </div>
 
@@ -109,7 +129,7 @@ export default function CreateTeamPage() {
                         )}
 
                         <button
-                            onClick={() => window.location.href = "/dashboard"}
+                            onClick={() => (window.location.href = "/dashboard")}
                             className="mt-6 w-full bg-gradient-to-r from-blue-600 to-purple-600 py-3 rounded-xl font-medium hover:scale-[1.02] transition"
                         >
                             Go to Dashboard

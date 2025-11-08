@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Users, UserPlus, ArrowRight } from "lucide-react";
 
 export default function TeamChoosePage() {
+  
   return (
     <div className="min-h-screen bg-[#0a0f1a] flex items-center justify-center px-5">
       <motion.div
