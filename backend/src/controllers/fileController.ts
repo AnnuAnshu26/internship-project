@@ -11,36 +11,50 @@ cloudinary.v2.config({
   api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-export const uploadFile = async (req:any, res:any) => {
+export const uploadFile = async (req, res) => {
   try {
     const { teamId } = req.body;
     const file = req.file;
+
+    if (!file) return res.status(400).json({ message: "No file uploaded" });
+
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ message: "Unauthorized: User not found in request" });
+    }
+
     const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: "User not found in database" });
 
-    if (!file) return res.status(400).json({ message: "No file" });
+    // Upload to Cloudinary
+    const result = await cloudinary.v2.uploader.upload(file.path, {
+      resource_type: "auto",
+      folder: `teamify.ai/${teamId}`,
+      access_mode: "public"
+    });
 
-    // upload local temp file
-    const result = await cloudinary.v2.uploader.upload(file.path, { resource_type: "auto", folder: `hackcollab/${teamId}` });
-
-    // save record
+    // Save file info
     const fileDoc = await FileModel.create({
       teamId,
       fileName: file.originalname,
       fileUrl: result.secure_url,
       fileSize: file.size,
       uploadedBy: user._id,
-      uploadedByName: user.name
+      uploadedByName: user.name,
     });
 
-    // delete temp file
-    fs.unlinkSync(file.path);
+    // Safely remove tmp file
+    try {
+      fs.unlinkSync(file.path);
+    } catch {}
 
-    res.json({ file: fileDoc });
-  } catch (err:any) {
-    console.error(err);
+    res.status(200).json({ file: fileDoc });
+
+  } catch (err) {
+    console.error("❌ Upload Error =>", err);
     res.status(500).json({ message: err.message });
   }
 };
+
 
 export const listFiles = async (req:any, res:any) => {
   try {
