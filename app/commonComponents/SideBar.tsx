@@ -31,6 +31,14 @@ const links = [
 export default function Sidebar() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [userName, setUserName] = useState("");
+  useState(() => {
+    const user = localStorage.getItem("user");
+    if (user) {
+      setUserName(JSON.parse(user).name);
+    }
+  }, []);
+
 
   return (
     <>
@@ -89,7 +97,7 @@ export default function Sidebar() {
         {/* Bottom Settings */}
         <div className="px-4 py-2 border-t border-white/10">
           <Link
-            href="/settings"
+            href="/dashboard/settings"
             onClick={() => setOpen(false)}
             className={cn(
               "flex items-center gap-3 px-4 py-2.5 rounded-lg text-gray-400 hover:text-white hover:bg-[#111827]/50 transition-all",
@@ -97,7 +105,7 @@ export default function Sidebar() {
             )}
           >
             <User className="w-5 h-5" />
-            <span className="font-medium">Anushka Aggarwal</span>
+            <span className="font-medium">{userName || "User"}</span>
           </Link>
         </div>
       </aside>
