@@ -1,17 +1,27 @@
 {
   "compilerOptions": {
-    "target": "ES2020",
-    "module": "ESNext",
+    /* ✅ Output Settings */
+    "target": "ES2022",                     // Slightly newer target for Node 20+
+    "module": "ESNext",                     // Required for ESM ("type": "module")
     "moduleResolution": "node",
-    "rootDir": "./",
     "outDir": "./dist",
+    "rootDir": "./",
+
+    /* ✅ Interop & Type Safety */
     "esModuleInterop": true,
-    "strict": true,
+    "allowSyntheticDefaultImports": true,   // Fixes default import issues with ESM libs
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
     "skipLibCheck": true,
-    "resolveJsonModule": true
+    "strict": true,
+
+    /* ✅ Emit even if TS has small errors (optional for Render) */
+    "noEmitOnError": false
   },
   "include": ["server.ts", "src/**/*.ts"],
   "exclude": ["node_modules"],
+
+  /* ✅ Makes ts-node (for local dev) faster */
   "ts-node": {
     "transpileOnly": true
   }

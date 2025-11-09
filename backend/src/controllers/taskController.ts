@@ -1,38 +1,80 @@
-import Task from "../models/Task";
-import Notification from "../models/Notification";
+import Task from "../models/Task.js";              // ✅ added .js
+import Notification from "../models/Notification.js"; // ✅ added .js
 
-export const addTask = async (req:any, res:any) => {
+// ✅ Add a new task
+export const addTask = async (req: any, res: any) => {
   try {
-    const { teamId } = req.body;
-    const { title, description, assignedTo } = req.body;
-    if (!title) return res.status(400).json({ message: "Title required" });
+    const { teamId, title, description, assignedTo } = req.body;
 
-    const task = await Task.create({ teamId, title, description, assignedTo, status: "Pending" });
+    if (!title) {
+      res.status(400).json({ message: "Title required" });
+      return;
+    }
 
-    await Notification.create({ teamId, title: "New Task", subtitle: `${title} added`, type: "task" });
+    const task = await Task.create({
+      teamId,
+      title,
+      description,
+      assignedTo,
+      status: "Pending",
+    });
 
-    res.json({ task });
-  } catch (err:any) { res.status(500).json({ message: err.message }); }
+    await Notification.create({
+      teamId,
+      title: "New Task",
+      subtitle: `${title} added`,
+      type: "task",
+    });
+
+    res.status(201).json({ task });
+  } catch (err: any) {
+    console.error("❌ Add Task Error:", err);
+    res.status(500).json({ message: err.message });
+  }
 };
 
-export const updateTask = async (req:any, res:any) => {
+// ✅ Update an existing task
+export const updateTask = async (req: any, res: any) => {
   try {
     const { taskId } = req.params;
     const updates = req.body;
-    const task = await Task.findByIdAndUpdate(taskId, { ...updates, updatedAt: new Date() }, { new: true });
-    if (!task) return res.status(404).json({ message: "Task not found" });
-    // create notification when completed
-    if (updates.status === "Completed") {
-      await Notification.create({ teamId: task.teamId, title: "Task Completed", subtitle: `${task.title} completed`, type: "task" });
+
+    const task = await Task.findByIdAndUpdate(
+      taskId,
+      { ...updates, updatedAt: new Date() },
+      { new: true }
+    );
+
+    if (!task) {
+      res.status(404).json({ message: "Task not found" });
+      return;
     }
-    res.json({ task });
-  } catch (err:any) { res.status(500).json({ message: err.message }); }
+
+    // Create a notification when marked as completed
+    if (updates.status === "Completed") {
+      await Notification.create({
+        teamId: task.teamId,
+        title: "Task Completed",
+        subtitle: `${task.title} completed`,
+        type: "task",
+      });
+    }
+
+    res.status(200).json({ task });
+  } catch (err: any) {
+    console.error("❌ Update Task Error:", err);
+    res.status(500).json({ message: err.message });
+  }
 };
 
-export const listTasks = async (req:any, res:any) => {
+// ✅ List all tasks for a team
+export const listTasks = async (req: any, res: any) => {
   try {
     const { teamId } = req.params;
     const tasks = await Task.find({ teamId }).sort({ createdAt: -1 });
-    res.json({ tasks });
-  } catch (err:any) { res.status(500).json({ message: err.message }); }
+    res.status(200).json({ tasks });
+  } catch (err: any) {
+    console.error("❌ List Tasks Error:", err);
+    res.status(500).json({ message: err.message });
+  }
 };

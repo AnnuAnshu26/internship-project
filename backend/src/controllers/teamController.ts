@@ -1,85 +1,132 @@
-import Team from "../models/Team";
-import User from "../models/User";
-import { generateTeamCode } from "../utils/genCode";
-import Notification from "../models/Notification";
+import { Request, Response } from "express";
+import Team from "../models/Team.js";               // ✅ added .js
+import User from "../models/User.js";               // ✅ added .js
+import { generateTeamCode } from "../utils/genCode.js"; // ✅ added .js
+import Notification from "../models/Notification.js";   // ✅ added .js
 
-export const createTeam = async (req:any, res:any) => {
+// ✅ Create a new team
+export const createTeam = async (req: Request, res: Response): Promise<void> => {
   try {
-    const userId = req.user.id;
+    const userId = (req as any).user.id;
     const { name, description } = req.body;
-    if (!name) return res.status(400).json({ message: "Team name required" });
+
+    if (!name) {
+      res.status(400).json({ message: "Team name required" });
+      return;
+    }
 
     const code = generateTeamCode();
-    const team = await Team.create({ name, description, teamCode: code, leaderId: userId, members: [{ userId, role: "Leader" }] });
+    const team = await Team.create({
+      name,
+      description,
+      teamCode: code,
+      leaderId: userId,
+      members: [{ userId, role: "Leader" }],
+    });
 
-    // update user
-    await User.findByIdAndUpdate(userId, { teamId: team._id, roleInTeam: "Leader" });
+    await User.findByIdAndUpdate(userId, {
+      teamId: team._id,
+      roleInTeam: "Leader",
+    });
 
-    // notification (optional)
-    await Notification.create({ teamId: team._id, title: "Team Created", subtitle: `${req.user.email} created the team`, type: "info" });
+    await Notification.create({
+      teamId: team._id,
+      title: "Team Created",
+      subtitle: `${(req as any).user.email} created the team`,
+      type: "info",
+    });
 
-    res.json({ team });
-  } catch (err:any) {
-    res.status(500).json({ message: err.message });
+    res.status(201).json({ team });
+  } catch (err: any) {
+    console.error("❌ Create Team Error:", err);
+    res.status(500).json({ message: err.message || "Server error" });
   }
 };
 
-export const joinTeam = async (req:any, res:any) => {
+// ✅ Join an existing team
+export const joinTeam = async (req: Request, res: Response): Promise<void> => {
   try {
-    const userId = req.user.id;
+    const userId = (req as any).user.id;
     const { teamCode } = req.body;
-    if (!teamCode) return res.status(400).json({ message: "Code required" });
+
+    if (!teamCode) {
+      res.status(400).json({ message: "Team code required" });
+      return;
+    }
 
     const team = await Team.findOne({ teamCode });
-    if (!team) return res.status(404).json({ message: "Invalid team code" });
+    if (!team) {
+      res.status(404).json({ message: "Invalid team code" });
+      return;
+    }
 
-    // prevent double join
-    if (team.members.some((m:any) => String(m.userId) === String(userId))) {
-      return res.status(400).json({ message: "Already a member" });
+    if (team.members.some((m: any) => String(m.userId) === String(userId))) {
+      res.status(400).json({ message: "Already a member" });
+      return;
     }
 
     team.members.push({ userId, role: "Member" });
     await team.save();
 
-    await User.findByIdAndUpdate(userId, { teamId: team._id, roleInTeam: "Member" });
+    await User.findByIdAndUpdate(userId, {
+      teamId: team._id,
+      roleInTeam: "Member",
+    });
 
-    // notification
-    await Notification.create({ teamId: team._id, title: "Team Member Joined", subtitle: `${req.user.email} joined`, type: "join" });
+    await Notification.create({
+      teamId: team._id,
+      title: "Team Member Joined",
+      subtitle: `${(req as any).user.email} joined`,
+      type: "join",
+    });
 
-    res.json({ team });
-  } catch (err:any) {
-    res.status(500).json({ message: err.message });
+    res.status(200).json({ team });
+  } catch (err: any) {
+    console.error("❌ Join Team Error:", err);
+    res.status(500).json({ message: err.message || "Server error" });
   }
 };
 
-export const getMyTeam = async (req: any, res: any) => {
+// ✅ Get logged-in user’s team
+export const getMyTeam = async (req: Request, res: Response): Promise<void> => {
   try {
-    const userId = req.user.id;
-
-    // find user
+    const userId = (req as any).user.id;
     const user = await User.findById(userId);
-    if (!user || !user.teamId)
-      return res.status(404).json({ message: "User is not in any team" });
 
-    // find team and populate members
+    if (!user || !user.teamId) {
+      res.status(404).json({ message: "User is not in any team" });
+      return;
+    }
+
     const team = await Team.findById(user.teamId).populate(
       "members.userId",
       "name email roleInTeam"
     );
 
-    res.json({ team });
+    res.status(200).json({ team });
   } catch (err: any) {
-    res.status(500).json({ message: err.message });
+    console.error("❌ Get My Team Error:", err);
+    res.status(500).json({ message: err.message || "Server error" });
   }
 };
 
-export const getTeam = async (req:any, res:any) => {
+// ✅ Get team by ID
+export const getTeam = async (req: Request, res: Response): Promise<void> => {
   try {
     const { teamId } = req.params;
-    const team = await Team.findById(teamId).populate("members.userId", "name email roleInTeam");
-    if (!team) return res.status(404).json({ message: "Team not found" });
-    res.json({ team });
-  } catch (err:any) {
-    res.status(500).json({ message: err.message });
+    const team = await Team.findById(teamId).populate(
+      "members.userId",
+      "name email roleInTeam"
+    );
+
+    if (!team) {
+      res.status(404).json({ message: "Team not found" });
+      return;
+    }
+
+    res.status(200).json({ team });
+  } catch (err: any) {
+    console.error("❌ Get Team Error:", err);
+    res.status(500).json({ message: err.message || "Server error" });
   }
 };

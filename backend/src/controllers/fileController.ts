@@ -1,35 +1,53 @@
-import FileModel from "../models/File";
-import User from "../models/User";
+import { Request, Response } from "express";
+import FileModel from "../models/File.js";
+import User from "../models/User.js";
 import cloudinary from "cloudinary";
 import fs from "fs";
 import dotenv from "dotenv";
+
 dotenv.config();
 
 cloudinary.v2.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET
+  api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-export const uploadFile = async (req, res) => {
+interface AuthRequest extends Request {
+  user?: {
+    id: string;
+    name?: string;
+  };
+  file?: Express.Multer.File;
+}
+
+// ✅ Upload a file
+export const uploadFile = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { teamId } = req.body;
     const file = req.file;
 
-    if (!file) return res.status(400).json({ message: "No file uploaded" });
+    if (!file) {
+      res.status(400).json({ message: "No file uploaded" });
+      return;
+    }
 
-    if (!req.user || !req.user.id) {
-      return res.status(401).json({ message: "Unauthorized: User not found in request" });
+    if (!req.user?.id) {
+      res.status(401).json({ message: "Unauthorized: User not found in request" });
+      return;
     }
 
     const user = await User.findById(req.user.id);
-    if (!user) return res.status(404).json({ message: "User not found in database" });
+    if (!user) {
+      res.status(404).json({ message: "User not found in database" });
+      return;
+    }
 
     // Upload to Cloudinary
     const result = await cloudinary.v2.uploader.upload(file.path, {
       resource_type: "auto",
       folder: `teamify.ai/${teamId}`,
-      access_mode: "public"
+      access_mode: "public",
     });
 
     // Save file info
@@ -42,26 +60,31 @@ export const uploadFile = async (req, res) => {
       uploadedByName: user.name,
     });
 
-    // Safely remove tmp file
+    // Safely remove temporary file
     try {
       fs.unlinkSync(file.path);
-    } catch {}
+    } catch (cleanupErr: any) {
+      console.warn("⚠️ Failed to remove temp file:", cleanupErr.message);
+    }
 
     res.status(200).json({ file: fileDoc });
-
-  } catch (err) {
+  } catch (err: any) {
     console.error("❌ Upload Error =>", err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: err.message || "Server Error" });
   }
 };
 
-
-export const listFiles = async (req:any, res:any) => {
+// ✅ List all files for a team
+export const listFiles = async (req: Request, res: Response): Promise<void> => {
   try {
     const { teamId } = req.params;
-    const files = await FileModel.find({ teamId }).sort({ createdAt: -1 }).limit(200);
+    const files = await FileModel.find({ teamId })
+      .sort({ createdAt: -1 })
+      .limit(200);
+
     res.json({ files });
-  } catch (err:any) {
-    res.status(500).json({ message: err.message });
+  } catch (err: any) {
+    console.error("❌ List Files Error:", err);
+    res.status(500).json({ message: err.message || "Server Error" });
   }
 };
