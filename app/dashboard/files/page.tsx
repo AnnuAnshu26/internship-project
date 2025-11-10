@@ -4,9 +4,21 @@ import { useState, useEffect, useRef } from "react";
 import { Search, Upload, FileText, User } from "lucide-react";
 import { motion } from "framer-motion";
 
+// ✅ Use your backend API base URL
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+
+type FileType = {
+  _id: string;
+  fileName: string;
+  fileUrl: string;
+  fileSize: number;
+  uploadedByName: string;
+  createdAt: string;
+};
+
 export default function FilesPage() {
   const [search, setSearch] = useState("");
-  const [files, setFiles] = useState<any[]>([]);
+  const [files, setFiles] = useState<FileType[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const teamId = typeof window !== "undefined" ? localStorage.getItem("teamId") : null;
@@ -15,11 +27,17 @@ export default function FilesPage() {
   // ✅ Fetch files from backend
   const fetchFiles = async () => {
     if (!teamId || !token) return;
-    const res = await fetch(`http://localhost:5000/api/files/${teamId}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    const data = await res.json();
-    setFiles(data.files);
+
+    try {
+      const res = await fetch(`${API_BASE}/api/files/${teamId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      const data = await res.json();
+      setFiles(data.files || []);
+    } catch (err) {
+      console.error("Error fetching files:", err);
+    }
   };
 
   useEffect(() => {
@@ -31,26 +49,33 @@ export default function FilesPage() {
     const file = e.target.files?.[0];
     if (!file || !teamId || !token) return;
 
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("teamId", teamId);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("teamId", teamId);
 
-    await fetch(`http://localhost:5000/api/files/upload`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`
-      },
-      body: formData,
-    });
+      await fetch(`${API_BASE}/api/files/upload`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
 
-    fetchFiles(); // reload list after upload
+      await fetchFiles(); // reload list after upload
+    } catch (err) {
+      console.error("File upload failed:", err);
+    }
   };
 
   return (
     <div className="min-h-screen bg-[#0a0f1a] text-white p-5 md:p-8">
-
       {/* HEADER */}
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="mb-6"
+      >
         <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-blue-100 to-purple-200 bg-clip-text text-transparent">
           Files & Storage
         </h1>
@@ -91,7 +116,9 @@ export default function FilesPage() {
       {/* FILE LIST */}
       <div className="space-y-3">
         {files
-          .filter((file) => file.fileName.toLowerCase().includes(search.toLowerCase()))
+          .filter((file) =>
+            file.fileName.toLowerCase().includes(search.toLowerCase())
+          )
           .map((file, i) => (
             <motion.div
               key={file._id}
@@ -105,18 +132,15 @@ export default function FilesPage() {
                 <FileText className="text-purple-400 w-7 h-7" />
                 <div>
                   <p className="font-medium text-sm md:text-base">
-                   <a
-  href={file.fileUrl}
-  target="_blank"
-  rel="noopener noreferrer"
-  className="hover:underline text-blue-400"
-  download
->
-  {file.fileName}
-</a>
-
-
-
+                    <a
+                      href={file.fileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:underline text-blue-400"
+                      download
+                    >
+                      {file.fileName}
+                    </a>
                   </p>
                   <p className="text-xs text-gray-400">
                     {(file.fileSize / 1024).toFixed(1)} KB
@@ -128,7 +152,9 @@ export default function FilesPage() {
               <div className="flex items-center gap-6">
                 <div className="flex items-center gap-2">
                   <User className="text-gray-400 w-4 h-4" />
-                  <p className="text-xs sm:text-sm text-gray-300">{file.uploadedByName}</p>
+                  <p className="text-xs sm:text-sm text-gray-300">
+                    {file.uploadedByName}
+                  </p>
                 </div>
 
                 <p className="text-xs sm:text-sm text-gray-500">
@@ -139,7 +165,9 @@ export default function FilesPage() {
           ))}
 
         {files.length === 0 && (
-          <p className="text-gray-400 text-center mt-4">No files uploaded yet.</p>
+          <p className="text-gray-400 text-center mt-4">
+            No files uploaded yet.
+          </p>
         )}
       </div>
     </div>

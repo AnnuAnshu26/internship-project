@@ -9,229 +9,264 @@ import { cn } from "@/lib/utils";
 import Picker from "@emoji-mart/react";
 import data from "@emoji-mart/data";
 
+// ✅ Use Render URL from .env.local
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+
+// ✅ Define strong message type
+type MessageType = {
+  senderName: string;
+  from: "you" | "team";
+  text: string;
+};
+
 export default function ChatPage() {
-    const [socket, setSocket] = useState<Socket | null>(null);
-    const [messages, setMessages] = useState<{ senderName: string; from: "you" | "team"; text: string }[]>([]);
-    const [input, setInput] = useState("");
-    const [teamId, setTeamId] = useState<string | null>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [socket, setSocket] = useState<Socket | null>(null);
+  const [messages, setMessages] = useState<MessageType[]>([]);
+  const [input, setInput] = useState("");
+  const [teamId, setTeamId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
-    // ✅ Summary states
-    const [summary, setSummary] = useState("");
-    const [loadingSummary, setLoadingSummary] = useState(false);
+  // ✅ Summary states
+  const [summary, setSummary] = useState("");
+  const [loadingSummary, setLoadingSummary] = useState(false);
 
-    const recentMessages = useRef(new Set());
-    const makeMsgKey = (name: string, text: string) => `${name}:${text}`;
+  const recentMessages = useRef(new Set<string>());
+  const makeMsgKey = (name: string, text: string) => `${name}:${text}`;
 
-    // ✅ Generate Summary
-    const generateSummary = async () => {
-        if (messages.length === 0) return;
+  // ✅ Generate AI chat summary
+  const generateSummary = async () => {
+    if (messages.length === 0) return;
 
-        setLoadingSummary(true);
-        try {
-            const res = await fetch("http://localhost:5000/api/ai/summary", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ chats: messages }),
-            });
+    setLoadingSummary(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/ai/summary`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chats: messages }),
+      });
 
-            const data = await res.json();
-            setSummary(data.summary);
-        } catch (err) {
-            console.log("Summary error", err);
-        } finally {
-            setLoadingSummary(false);
+      const data = await res.json();
+      setSummary(data.summary || "No summary generated.");
+    } catch (err) {
+      console.error("Summary error", err);
+    } finally {
+      setLoadingSummary(false);
+    }
+  };
+
+  // ✅ Fetch old messages from backend
+  const fetchMessages = async () => {
+    const token = localStorage.getItem("token");
+    const team = localStorage.getItem("teamId");
+    if (!team || !token) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/api/chat/${team}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      const data = await res.json();
+      if (data.messages) {
+        const formatted: MessageType[] = [];
+
+        for (let m of data.messages) {
+          const key = makeMsgKey(m.senderName, m.text);
+          if (recentMessages.current.has(key)) continue;
+
+          recentMessages.current.add(key);
+          formatted.push({
+            senderName: m.senderName,
+            text: m.text,
+            from: (m.senderName === localStorage.getItem("userName")
+              ? "you"
+              : "team") as "you" | "team",
+          });
         }
+        setMessages(formatted);
+      }
+    } catch (err) {
+      console.error("Fetch messages error:", err);
+    }
+  };
+
+  // ✅ Setup WebSocket
+  useEffect(() => {
+    const newSocket = io(API_BASE, {
+      transports: ["websocket", "polling"],
+    });
+
+    setSocket(newSocket);
+
+    newSocket.on("connect", () => console.log("🟢 Connected:", newSocket.id));
+
+    newSocket.off("receive_message").on("receive_message", (msg: any) => {
+      const key = makeMsgKey(msg.senderName, msg.text);
+      if (recentMessages.current.has(key)) return;
+
+      recentMessages.current.add(key);
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          senderName: msg.senderName,
+          text: msg.text,
+          from: (msg.senderName === localStorage.getItem("userName")
+            ? "you"
+            : "team") as "you" | "team",
+        },
+      ]);
+    });
+
+    return () => {
+      newSocket.off("receive_message");
+      newSocket.disconnect();
     };
+  }, []);
 
-    const fetchMessages = async () => {
-        const token = localStorage.getItem("token");
-        const team = localStorage.getItem("teamId");
-        if (!team || !token) return;
+  // ✅ Load team ID from localStorage
+  useEffect(() => {
+    const stored = localStorage.getItem("teamId");
+    if (stored) setTeamId(stored);
+  }, []);
 
-        const res = await fetch(`http://localhost:5000/api/chat/${team}`, {
-            headers: { Authorization: `Bearer ${token}` },
-        });
+  // ✅ Join team room
+  useEffect(() => {
+    if (!socket || !teamId) return;
+    socket.emit("join_team", teamId);
+    fetchMessages();
+  }, [socket, teamId]);
 
-        const data = await res.json();
-        if (data.messages) {
-            const formatted = [];
+  // ✅ Send message
+  const sendMessage = async () => {
+    if (!input.trim() || !teamId || !socket) return;
 
-            for (let m of data.messages) {
-                const key = makeMsgKey(m.senderName, m.text);
-                if (recentMessages.current.has(key)) continue;
+    const senderName = localStorage.getItem("userName") || "Unknown";
+    const key = makeMsgKey(senderName, input);
 
-                recentMessages.current.add(key);
-                formatted.push({
-                    senderName: m.senderName,
-                    text: m.text,
-                    from: m.senderName === localStorage.getItem("userName") ? "you" : "team",
-                });
-            }
-            setMessages(formatted);
-        }
-    };
+    if (!recentMessages.current.has(key)) {
+      recentMessages.current.add(key);
+      setMessages((prev) => [
+        ...prev,
+        { senderName, text: input, from: "you" },
+      ]);
+    }
 
-    useEffect(() => {
-        const newSocket = io("http://localhost:5000", {
-            transports: ["websocket", "polling"],
-        });
+    const token = localStorage.getItem("token");
 
-        setSocket(newSocket);
+    await fetch(`${API_BASE}/api/chat/${teamId}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ teamId, text: input, senderName }),
+    });
 
-        newSocket.on("connect", () => console.log("Connected:", newSocket.id));
+    socket.emit("send_message", { teamId, senderName, text: input });
+    setInput("");
+  };
 
-        newSocket.off("receive_message").on("receive_message", (msg) => {
-            const key = makeMsgKey(msg.senderName, msg.text);
-            if (recentMessages.current.has(key)) return;
+  // ✅ Send file as chat message
+  const sendFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !teamId || !socket) return;
 
-            recentMessages.current.add(key);
+    const name = localStorage.getItem("userName") || "Unknown";
+    const fileMsg = `📎 File: ${file.name}`;
+    const key = makeMsgKey(name, fileMsg);
 
-            setMessages((prev) => [
-                ...prev,
-                {
-                    senderName: msg.senderName,
-                    text: msg.text,
-                    from: msg.senderName === localStorage.getItem("userName") ? "you" : "team",
-                },
-            ]);
-        });
+    if (!recentMessages.current.has(key)) {
+      recentMessages.current.add(key);
+      setMessages((prev) => [
+        ...prev,
+        { senderName: name, text: fileMsg, from: "you" },
+      ]);
+    }
 
-        return () => {
-            newSocket.off("receive_message");
-            newSocket.disconnect();
-        };
-    }, []);
+    socket.emit("send_message", { teamId, text: fileMsg, senderName: name });
+  };
 
-    useEffect(() => {
-        const stored = localStorage.getItem("teamId");
-        if (stored) setTeamId(stored);
-    }, []);
+  // ✅ UI
+  return (
+    <div className="h-[100dvh] w-full flex flex-col bg-gradient-to-br from-[#020617] via-[#0b0f26] to-[#1e1b4b] text-white p-6">
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-2xl font-bold">Team Chat</h1>
 
-    useEffect(() => {
-        if (!socket || !teamId) return;
-        socket.emit("join_team", teamId);
-        fetchMessages();
-    }, [socket, teamId]);
+        <Button
+          onClick={generateSummary}
+          disabled={loadingSummary}
+          className="bg-purple-500 hover:bg-purple-600 text-white"
+        >
+          {loadingSummary ? "Generating..." : "Summarize Chat"}
+        </Button>
+      </div>
 
-    const sendMessage = async () => {
-        if (!input.trim() || !teamId || !socket) return;
-
-        const senderName = localStorage.getItem("userName") || "Unknown";
-        const key = makeMsgKey(senderName, input);
-
-        if (!recentMessages.current.has(key)) {
-            recentMessages.current.add(key);
-            setMessages((prev) => [...prev, { senderName, text: input, from: "you" }]);
-        }
-
-        const token = localStorage.getItem("token");
-
-        await fetch(`http://localhost:5000/api/chat/${teamId}`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({ teamId, text: input, senderName }),
-        });
-
-        socket.emit("send_message", { teamId, senderName, text: input });
-        setInput("");
-    };
-
-    const sendFile = (e: any) => {
-        const file = e.target.files[0];
-        if (!file || !teamId || !socket) return;
-
-        const name = localStorage.getItem("userName") || "Unknown";
-        const fileMsg = `📎 File: ${file.name}`;
-        const key = makeMsgKey(name, fileMsg);
-
-        if (!recentMessages.current.has(key)) {
-            recentMessages.current.add(key);
-            setMessages((prev) => [...prev, { senderName: name, text: fileMsg, from: "you" }]);
-        }
-
-        socket.emit("send_message", { teamId, text: fileMsg, senderName: name });
-    };
-
-    return (
-        <div className="h-[100dvh] w-full flex flex-col bg-gradient-to-br from-[#020617] via-[#0b0f26] to-[#1e1b4b] text-white p-6">
-            <div className="flex justify-between items-center mb-4">
-  <h1 className="text-2xl font-bold">Team Chat</h1>
-
-  <Button
-    onClick={generateSummary}
-    disabled={loadingSummary}
-    className="bg-purple-200 hover:bg-purple-500"
-  >
-    {loadingSummary ? "Generating..." : "Summarize Chat"}
-  </Button>
-</div>
-
-
-            {/* ✅ Summary Box */}
-            {summary && (
-                <div className="p-3 bg-black/30 border border-purple-700 rounded-md text-sm mb-4">
-                    ✨ <b>Chat Summary:</b>
-                    <p className="mt-1 whitespace-pre-line">{summary}</p>
-                </div>
-            )}
-
-            <div className="flex-1 overflow-y-auto space-y-3 p-4 rounded-xl bg-black/20 border border-white/10">
-                {messages.map((msg, i) => (
-                    <motion.div
-                        key={i}
-                        initial={{ opacity: 0, x: msg.from === "you" ? 40 : -40 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        className={cn(
-                            "max-w-[75%] p-3 rounded-xl text-sm",
-                            msg.from === "you" ? "ml-auto bg-blue-600" : "bg-black/40 border border-gray-700"
-                        )}
-                    >
-                        <div className="flex items-center gap-1 mb-1">
-                            {msg.from === "you" ? (
-                                <User2 className="w-4 h-4" />
-                            ) : (
-                                <Users className="w-4 h-4 text-purple-400" />
-                            )}
-                            <span className="text-xs font-semibold">{msg.senderName}</span>
-                        </div>
-                        <p>{msg.text}</p>
-                    </motion.div>
-                ))}
-            </div>
-
-            <div className="mt-4 flex items-center gap-3 px-4 py-3 rounded-xl bg-black/20 border border-white/10">
-                <button onClick={() => fileInputRef.current?.click()}>
-                    <FileUp className="w-6 h-6 text-gray-300 hover:text-purple-400" />
-                </button>
-                <input type="file" ref={fileInputRef} className="hidden" onChange={sendFile} />
-
-                <div className="relative">
-                    <button onClick={() => setShowEmojiPicker(!showEmojiPicker)}>
-                        <Smile className="w-6 h-6 text-gray-300 hover:text-purple-400" />
-                    </button>
-                    {showEmojiPicker && (
-                        <div className="absolute bottom-12">
-                            <Picker data={data} onEmojiSelect={(e: any) => setInput(input + e.native)} theme="dark" />
-                        </div>
-                    )}
-                </div>
-
-                <input
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    className="flex-1 bg-transparent outline-none"
-                    placeholder="Type a message..."
-                />
-
-                <Button onClick={sendMessage} className="bg-purple-700 hover:bg-purple-500">
-                    <Send className="w-5 h-5" />
-                </Button>
-            </div>
+      {summary && (
+        <div className="p-3 bg-black/30 border border-purple-700 rounded-md text-sm mb-4">
+          ✨ <b>Chat Summary:</b>
+          <p className="mt-1 whitespace-pre-line">{summary}</p>
         </div>
-    );
+      )}
+
+      <div className="flex-1 overflow-y-auto space-y-3 p-4 rounded-xl bg-black/20 border border-white/10">
+        {messages.map((msg, i) => (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, x: msg.from === "you" ? 40 : -40 }}
+            animate={{ opacity: 1, x: 0 }}
+            className={cn(
+              "max-w-[75%] p-3 rounded-xl text-sm",
+              msg.from === "you"
+                ? "ml-auto bg-blue-600"
+                : "bg-black/40 border border-gray-700"
+            )}
+          >
+            <div className="flex items-center gap-1 mb-1">
+              {msg.from === "you" ? (
+                <User2 className="w-4 h-4" />
+              ) : (
+                <Users className="w-4 h-4 text-purple-400" />
+              )}
+              <span className="text-xs font-semibold">{msg.senderName}</span>
+            </div>
+            <p>{msg.text}</p>
+          </motion.div>
+        ))}
+      </div>
+
+      <div className="mt-4 flex items-center gap-3 px-4 py-3 rounded-xl bg-black/20 border border-white/10">
+        <button onClick={() => fileInputRef.current?.click()}>
+          <FileUp className="w-6 h-6 text-gray-300 hover:text-purple-400" />
+        </button>
+        <input type="file" ref={fileInputRef} className="hidden" onChange={sendFile} />
+
+        <div className="relative">
+          <button onClick={() => setShowEmojiPicker(!showEmojiPicker)}>
+            <Smile className="w-6 h-6 text-gray-300 hover:text-purple-400" />
+          </button>
+          {showEmojiPicker && (
+            <div className="absolute bottom-12">
+              <Picker
+                data={data}
+                onEmojiSelect={(e: any) => setInput((prev) => prev + e.native)}
+                theme="dark"
+              />
+            </div>
+          )}
+        </div>
+
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          className="flex-1 bg-transparent outline-none"
+          placeholder="Type a message..."
+        />
+
+        <Button onClick={sendMessage} className="bg-purple-700 hover:bg-purple-500">
+          <Send className="w-5 h-5" />
+        </Button>
+      </div>
+    </div>
+  );
 }

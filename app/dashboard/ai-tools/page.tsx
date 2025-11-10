@@ -27,7 +27,7 @@ export default function AITools() {
 
     try {
       setLoading(true);
-      const res = await fetch("http://localhost:5000/api/ai/generate-pitch", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ai/generate-pitch`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: pitchInput }),
@@ -52,7 +52,7 @@ export default function AITools() {
     setUserInput("");
 
     try {
-      const res = await fetch("http://localhost:5000/api/ai/chat", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ai/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: userInput }),

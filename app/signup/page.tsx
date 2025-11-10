@@ -6,52 +6,51 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Zap } from "lucide-react";
+import { ArrowLeft, Zap, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 
 export default function SignUp() {
   const router = useRouter();
+  const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [form, setForm] = useState({
     name: "",
     email: "",
-    password: ""
+    password: "",
   });
-  const [isLoading, setIsLoading] = useState(false);
 
   const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
 
-
     try {
-      const res = await fetch("http://localhost:5000/api/auth/signup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/api/auth/signup`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(form),
+        }
+      );
 
       const data = await res.json();
-      console.log("Response status:", res.status);
-      console.log("Response data:", data);
-      console.log("Token saved ✅", data.token);
 
+      if (!res.ok) throw new Error(data.message || "Signup failed");
 
-      if (!res.ok) {
-        toast.error(data.message || "Signup failed");
-        setIsLoading(false);
-        return;
-      }
-
-      // ✅ Save token and redirect
+      // ✅ Save token and user data
       localStorage.setItem("token", data.token);
       localStorage.setItem("userName", data.user.name);
-      toast.success("Account created! Welcome aboard 🚀");
-      router.push("/team/choose");
+      localStorage.setItem("user", JSON.stringify(data.user));
 
-    } catch (error) {
-      toast.error("Something went wrong!");
+      toast.success("Account created successfully! 🎉");
+
+      // Redirect to team setup or dashboard
+      router.push("/team/choose");
+    } catch (err: any) {
+      toast.error(err.message || "Something went wrong!");
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   return (
@@ -96,6 +95,7 @@ export default function SignUp() {
 
         {/* Form */}
         <form onSubmit={handleSignup} className="space-y-5">
+          {/* Name */}
           <div className="space-y-2">
             <Label htmlFor="name" className="text-gray-300">
               Full Name
@@ -109,9 +109,9 @@ export default function SignUp() {
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               className="bg-black/40 border border-white/10 text-white placeholder:text-gray-500 focus-visible:ring-[#8b5cff]"
             />
-
           </div>
 
+          {/* Email */}
           <div className="space-y-2">
             <Label htmlFor="email" className="text-gray-300">
               Email
@@ -125,37 +125,36 @@ export default function SignUp() {
               onChange={(e) => setForm({ ...form, email: e.target.value })}
               className="bg-black/40 border border-white/10 text-white placeholder:text-gray-500 focus-visible:ring-[#8b5cff]"
             />
-
           </div>
 
-          <div className="space-y-2">
+          {/* Password */}
+          <div className="space-y-2 relative">
             <Label htmlFor="password" className="text-gray-300">
               Password
             </Label>
             <Input
               id="password"
-              type="password"
+              type={showPassword ? "text" : "password"}
               placeholder="••••••••"
               required
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
-              className="bg-black/40 border border-white/10 text-white placeholder:text-gray-500 focus-visible:ring-[#8b5cff]"
+              className="bg-black/40 border border-white/10 text-white placeholder:text-gray-500 focus-visible:ring-[#8b5cff] pr-10"
             />
-
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-[38px] text-gray-400 hover:text-white transition"
+            >
+              {showPassword ? (
+                <EyeOff className="w-4 h-4" />
+              ) : (
+                <Eye className="w-4 h-4" />
+              )}
+            </button>
           </div>
 
-          {/* <div className="space-y-2">
-            <Label htmlFor="team-code" className="text-gray-300">
-              Team Code (Optional)
-            </Label>
-            <Input
-              id="team-code"
-              type="text"
-              placeholder="HACK2024"
-              className="bg-black/40 border border-white/10 text-white placeholder:text-gray-500 focus-visible:ring-[#8b5cff]"
-            />
-          </div> */}
-
+          {/* Submit Button */}
           <Button
             type="submit"
             disabled={isLoading}
@@ -164,6 +163,7 @@ export default function SignUp() {
             {isLoading ? "Creating account..." : "Create Account"}
           </Button>
 
+          {/* Redirect */}
           <p className="text-center text-sm text-gray-400 mt-4">
             Already have an account?{" "}
             <Link href="/signin" className="text-[#9b59ff] hover:underline">
