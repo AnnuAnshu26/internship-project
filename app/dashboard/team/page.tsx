@@ -5,9 +5,10 @@ import { useState, useEffect } from "react";
 import { Search, UserPlus, Copy } from "lucide-react";
 import { toast } from "sonner";
 
-// ✅ Safe API base (fixes %7Bprocess.env...%7D and trailing slash issues)
+// ✅ Safe API base (handles Render + Localhost correctly)
 const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "http://localhost:5000";
+  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ||
+  "http://localhost:5000";
 console.log("👥 Team API_BASE =", API_BASE);
 
 type TeamMember = {
@@ -32,7 +33,7 @@ export default function TeamPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
-  // ✅ Fetch team data from backend
+  // ✅ Fetch team data from backend and store teamId
   useEffect(() => {
     const fetchTeam = async () => {
       try {
@@ -56,7 +57,13 @@ export default function TeamPage() {
 
         const data = await res.json();
         if (!data.team) throw new Error("No team found for this user");
+
         setTeam(data.team);
+
+        // ✅ Store teamId for chat use
+        localStorage.setItem("teamId", data.team._id);
+        console.log("💾 Saved teamId:", data.team._id);
+        toast.success(`Team loaded: ${data.team.name}`);
       } catch (err: any) {
         console.error("❌ Error fetching team:", err);
         toast.error(err.message || "Error loading team");
@@ -72,7 +79,7 @@ export default function TeamPage() {
   const handleCopyCode = () => {
     if (!team?.teamCode) return;
     navigator.clipboard.writeText(team.teamCode);
-    toast.success("Team code copied to clipboard!");
+    toast.success("✅ Team code copied to clipboard!");
   };
 
   // ---------- UI ----------
