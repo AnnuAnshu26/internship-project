@@ -9,9 +9,10 @@ import { cn } from "@/lib/utils";
 import Picker from "@emoji-mart/react";
 import data from "@emoji-mart/data";
 
-// ✅ Safe base URL (handles both Render + Localhost)
+// ✅ Safe base URL for both local & Render
 const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "http://localhost:5000";
+  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ||
+  "http://localhost:5000";
 console.log("🌍 API_BASE =", API_BASE);
 
 type MessageType = {
@@ -34,11 +35,12 @@ export default function ChatPage() {
   const recentMessages = useRef(new Set<string>());
   const makeMsgKey = (name: string, text: string) => `${name}:${text}`;
 
-  // ✅ Generate AI chat summary
+  /* ---------------------- 🧠 AI CHAT SUMMARY ---------------------- */
   const generateSummary = async () => {
     if (messages.length === 0) return;
     setLoadingSummary(true);
     try {
+      console.log("🧠 Generating summary with", messages.length, "messages");
       const res = await fetch(`${API_BASE}/api/ai/summary`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -46,19 +48,25 @@ export default function ChatPage() {
       });
 
       const data = await res.json();
+      console.log("🧠 AI Response:", data);
+      if (!res.ok) throw new Error(data.message || "Summary failed");
       setSummary(data.summary || "No summary generated.");
     } catch (err) {
-      console.error("Summary error", err);
+      console.error("❌ Summary error:", err);
+      setSummary("Error generating summary. Please try again.");
     } finally {
       setLoadingSummary(false);
     }
   };
 
-  // ✅ Fetch chat history
+  /* ---------------------- 💬 FETCH EXISTING MESSAGES ---------------------- */
   const fetchMessages = async () => {
     const token = localStorage.getItem("token");
     const team = localStorage.getItem("teamId");
-    if (!team || !token) return;
+    if (!team || !token) {
+      console.warn("⚠️ Missing teamId or token, cannot fetch messages");
+      return;
+    }
 
     try {
       const res = await fetch(`${API_BASE}/api/chat/${team}`, {
@@ -67,6 +75,7 @@ export default function ChatPage() {
       const data = await res.json();
 
       if (data.messages) {
+        console.log(`💬 Loaded ${data.messages.length} old messages`);
         const formatted: MessageType[] = [];
         for (let m of data.messages) {
           const key = makeMsgKey(m.senderName, m.text);
@@ -84,21 +93,26 @@ export default function ChatPage() {
         setMessages(formatted);
       }
     } catch (err) {
-      console.error("Fetch messages error:", err);
+      console.error("❌ Fetch messages error:", err);
     }
   };
 
-  // ✅ Setup WebSocket (Render + Local)
+  /* ---------------------- ⚡ SETUP SOCKET.IO ---------------------- */
   useEffect(() => {
     const newSocket = io(API_BASE, {
       transports: ["websocket", "polling"],
       secure: API_BASE.startsWith("https"),
+      withCredentials: true,
     });
 
     setSocket(newSocket);
-    newSocket.on("connect", () => console.log("🟢 Connected:", newSocket.id));
+
+    newSocket.on("connect", () => {
+      console.log("🟢 Socket Connected:", newSocket.id);
+    });
 
     newSocket.on("receive_message", (msg: any) => {
+      console.log("📨 Incoming socket message:", msg);
       const key = makeMsgKey(msg.senderName, msg.text);
       if (recentMessages.current.has(key)) return;
       recentMessages.current.add(key);
@@ -115,29 +129,40 @@ export default function ChatPage() {
       ]);
     });
 
+    newSocket.on("disconnect", () =>
+      console.log("🔴 Socket Disconnected")
+    );
+
     return () => {
       newSocket.disconnect();
     };
   }, []);
 
-  // ✅ Load teamId and join room
+  /* ---------------------- 🧾 LOAD TEAM INFO ---------------------- */
   useEffect(() => {
     const stored = localStorage.getItem("teamId");
-    if (stored) setTeamId(stored);
+    if (stored) {
+      console.log("🧩 Loaded teamId:", stored);
+      setTeamId(stored);
+    } else {
+      console.warn("⚠️ No teamId found in localStorage");
+    }
   }, []);
 
   useEffect(() => {
     if (!socket || !teamId) return;
+    console.log("🚪 Joining team room:", teamId);
     socket.emit("join_team", teamId);
     fetchMessages();
   }, [socket, teamId]);
 
-  // ✅ Send message
+  /* ---------------------- ✉️ SEND MESSAGE ---------------------- */
   const sendMessage = async () => {
     if (!input.trim() || !teamId || !socket) return;
 
     const senderName = localStorage.getItem("userName") || "Unknown";
     const key = makeMsgKey(senderName, input);
+    console.log("📤 Sending message:", { teamId, senderName, text: input });
 
     if (!recentMessages.current.has(key)) {
       recentMessages.current.add(key);
@@ -145,20 +170,29 @@ export default function ChatPage() {
     }
 
     const token = localStorage.getItem("token");
-    await fetch(`${API_BASE}/api/chat/${teamId}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ teamId, text: input, senderName }),
-    });
+
+    try {
+      const res = await fetch(`${API_BASE}/api/chat/${teamId}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ teamId, text: input, senderName }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        console.error("❌ Chat API failed:", err);
+      }
+    } catch (err) {
+      console.error("❌ Fetch send error:", err);
+    }
 
     socket.emit("send_message", { teamId, senderName, text: input });
     setInput("");
   };
 
-  // ✅ Send file as chat message
+  /* ---------------------- 📁 SEND FILE ---------------------- */
   const sendFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !teamId || !socket) return;
@@ -178,9 +212,10 @@ export default function ChatPage() {
     socket.emit("send_message", { teamId, text: fileMsg, senderName: name });
   };
 
-  // ✅ UI
+  /* ---------------------- 💻 UI ---------------------- */
   return (
     <div className="h-[100dvh] w-full flex flex-col bg-gradient-to-br from-[#020617] via-[#0b0f26] to-[#1e1b4b] text-white p-6">
+      {/* Header */}
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-2xl font-bold">Team Chat</h1>
         <Button
@@ -192,6 +227,7 @@ export default function ChatPage() {
         </Button>
       </div>
 
+      {/* Summary */}
       {summary && (
         <div className="p-3 bg-black/30 border border-purple-700 rounded-md text-sm mb-4">
           ✨ <b>Chat Summary:</b>
@@ -199,6 +235,7 @@ export default function ChatPage() {
         </div>
       )}
 
+      {/* Messages */}
       <div className="flex-1 overflow-y-auto space-y-3 p-4 rounded-xl bg-black/20 border border-white/10">
         {messages.map((msg, i) => (
           <motion.div
@@ -225,6 +262,7 @@ export default function ChatPage() {
         ))}
       </div>
 
+      {/* Input Bar */}
       <div className="mt-4 flex items-center gap-3 px-4 py-3 rounded-xl bg-black/20 border border-white/10">
         <button onClick={() => fileInputRef.current?.click()}>
           <FileUp className="w-6 h-6 text-gray-300 hover:text-purple-400" />
@@ -241,7 +279,7 @@ export default function ChatPage() {
             <Smile className="w-6 h-6 text-gray-300 hover:text-purple-400" />
           </button>
           {showEmojiPicker && (
-            <div className="absolute bottom-12">
+            <div className="absolute bottom-12 z-50">
               <Picker
                 data={data}
                 onEmojiSelect={(e: any) =>
@@ -256,7 +294,7 @@ export default function ChatPage() {
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          className="flex-1 bg-transparent outline-none"
+          className="flex-1 bg-transparent outline-none text-white"
           placeholder="Type a message..."
         />
 
