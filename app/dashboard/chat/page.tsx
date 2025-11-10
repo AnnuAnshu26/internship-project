@@ -11,6 +11,7 @@ import data from "@emoji-mart/data";
 
 // ✅ Use Render URL from .env.local
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+console.log("🌍 API_BASE =", API_BASE);
 
 // ✅ Define strong message type
 type MessageType = {
