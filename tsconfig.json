@@ -30,5 +30,10 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    "backend",           // ⛔ ignore backend folder during build
+    "**/backend/**/*",   // ⛔ also ignore nested backend files if any
+    "dist"               // optional: skip build output folder if present
+  ]
 }
