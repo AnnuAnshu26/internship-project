@@ -4,8 +4,10 @@ import { useState, useEffect, useRef } from "react";
 import { Search, Upload, FileText, User } from "lucide-react";
 import { motion } from "framer-motion";
 
-// ✅ Use your backend API base URL
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+// ✅ Safe API base (removes trailing slash and works in all environments)
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "http://localhost:5000";
+console.log("📁 Files API_BASE =", API_BASE);
 
 type FileType = {
   _id: string;
@@ -21,8 +23,10 @@ export default function FilesPage() {
   const [files, setFiles] = useState<FileType[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const teamId = typeof window !== "undefined" ? localStorage.getItem("teamId") : null;
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const teamId =
+    typeof window !== "undefined" ? localStorage.getItem("teamId") : null;
+  const token =
+    typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
   // ✅ Fetch files from backend
   const fetchFiles = async () => {
@@ -33,10 +37,12 @@ export default function FilesPage() {
         headers: { Authorization: `Bearer ${token}` },
       });
 
+      if (!res.ok) throw new Error("Failed to fetch files");
+
       const data = await res.json();
       setFiles(data.files || []);
     } catch (err) {
-      console.error("Error fetching files:", err);
+      console.error("❌ Error fetching files:", err);
     }
   };
 
@@ -54,7 +60,7 @@ export default function FilesPage() {
       formData.append("file", file);
       formData.append("teamId", teamId);
 
-      await fetch(`${API_BASE}/api/files/upload`, {
+      const res = await fetch(`${API_BASE}/api/files/upload`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -62,9 +68,11 @@ export default function FilesPage() {
         body: formData,
       });
 
+      if (!res.ok) throw new Error("Upload failed");
+
       await fetchFiles(); // reload list after upload
     } catch (err) {
-      console.error("File upload failed:", err);
+      console.error("❌ File upload failed:", err);
     }
   };
 
@@ -86,21 +94,19 @@ export default function FilesPage() {
 
       {/* UPLOAD + SEARCH */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6">
-        <>
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileUpload}
-            className="hidden"
-          />
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileUpload}
+          className="hidden"
+        />
 
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:scale-[1.02] transition text-white px-5 py-2.5 rounded-xl font-medium"
-          >
-            <Upload size={18} /> Upload File
-          </button>
-        </>
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          className="flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:scale-[1.02] transition text-white px-5 py-2.5 rounded-xl font-medium"
+        >
+          <Upload size={18} /> Upload File
+        </button>
 
         <div className="flex items-center bg-[#111827] px-4 py-2.5 rounded-xl border border-white/10 flex-1">
           <Search size={18} className="text-gray-400" />

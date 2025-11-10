@@ -5,7 +5,10 @@ import { User, Bell, Shield } from "lucide-react";
 import Image from "next/image";
 import { toast } from "sonner";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+// ✅ Safe base URL (removes trailing slash)
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "http://localhost:5000";
+console.log("⚙️ Settings API_BASE =", API_BASE);
 
 export default function SettingsPage() {
   const [profile, setProfile] = useState({
@@ -43,7 +46,7 @@ export default function SettingsPage() {
       });
 
       if (!res.ok) {
-        console.warn("No /api/auth/me endpoint found — skipping fetch");
+        console.warn("⚠️ /api/auth/me endpoint not found — skipping");
         return;
       }
 
@@ -62,7 +65,7 @@ export default function SettingsPage() {
         });
       }
     } catch (err) {
-      console.error("Error fetching profile:", err);
+      console.error("❌ Error fetching profile:", err);
     }
   };
 
@@ -94,7 +97,7 @@ export default function SettingsPage() {
     }
   };
 
-  // ✅ Save preferences locally for now (you can later add API route)
+  // ✅ Save preferences locally (can later be linked to backend)
   const savePreferences = () => {
     localStorage.setItem("preferences", JSON.stringify(preferences));
     toast.success("Preferences saved!");
@@ -211,7 +214,10 @@ export default function SettingsPage() {
             title={key.replace(/([A-Z])/g, " $1")}
             enabled={value}
             onChange={() =>
-              setPreferences((p) => ({ ...p, [key]: !p[key as keyof typeof p] }))
+              setPreferences((p) => ({
+                ...p,
+                [key]: !p[key as keyof typeof p],
+              }))
             }
           />
         ))}

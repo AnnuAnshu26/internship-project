@@ -5,8 +5,10 @@ import { useState, useEffect } from "react";
 import { Search, UserPlus, Copy } from "lucide-react";
 import { toast } from "sonner";
 
-// ✅ Use environment variable for backend
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+// ✅ Safe API base (fixes %7Bprocess.env...%7D and trailing slash issues)
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "http://localhost:5000";
+console.log("👥 Team API_BASE =", API_BASE);
 
 type TeamMember = {
   userId: {
@@ -35,7 +37,10 @@ export default function TeamPage() {
     const fetchTeam = async () => {
       try {
         const token = localStorage.getItem("token");
-        if (!token) return toast.error("Please login first!");
+        if (!token) {
+          toast.error("Please login first!");
+          return;
+        }
 
         const res = await fetch(`${API_BASE}/api/team/me`, {
           headers: {
@@ -44,12 +49,17 @@ export default function TeamPage() {
           },
         });
 
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.message || "Failed to load team");
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(errorData.message || "Failed to load team");
+        }
 
+        const data = await res.json();
+        if (!data.team) throw new Error("No team found for this user");
         setTeam(data.team);
       } catch (err: any) {
-        toast.error(err.message || "Something went wrong");
+        console.error("❌ Error fetching team:", err);
+        toast.error(err.message || "Error loading team");
       } finally {
         setLoading(false);
       }
@@ -57,6 +67,15 @@ export default function TeamPage() {
 
     fetchTeam();
   }, []);
+
+  // ✅ Copy team code to clipboard
+  const handleCopyCode = () => {
+    if (!team?.teamCode) return;
+    navigator.clipboard.writeText(team.teamCode);
+    toast.success("Team code copied to clipboard!");
+  };
+
+  // ---------- UI ----------
 
   if (loading)
     return (
@@ -74,12 +93,6 @@ export default function TeamPage() {
 
   const members = team.members || [];
 
-  const handleCopyCode = () => {
-    if (!team.teamCode) return;
-    navigator.clipboard.writeText(team.teamCode);
-    toast.success("Team code copied to clipboard!");
-  };
-
   return (
     <div className="p-6 sm:p-8 bg-[#0a0f1a] text-white min-h-screen flex flex-col gap-10">
       {/* ---------- TEAM HEADER ---------- */}
@@ -96,7 +109,6 @@ export default function TeamPage() {
             {team.description || "No description added"}
           </p>
 
-          {/* badges */}
           <div className="flex gap-3 mt-4">
             <span className="px-4 py-1.5 rounded-full bg-[#1e2637] text-purple-300 text-sm">
               {members.length} Members
@@ -116,10 +128,9 @@ export default function TeamPage() {
             <UserPlus size={18} /> Invite Members
           </button>
 
-          {/* Team Code Box */}
           <div
             onClick={handleCopyCode}
-            className="flex cursor-pointer items-center gap-2 bg-[#1a2031] border border-white/10 px-4 py-2 rounded-lg hover:bg-[#20283c]"
+            className="flex cursor-pointer items-center gap-2 bg-[#1a2031] border border-white/10 px-4 py-2 rounded-lg hover:bg-[#20283c] transition"
           >
             <span className="text-sm text-gray-300">
               {team.teamCode || "Loading..."}
@@ -158,7 +169,7 @@ export default function TeamPage() {
             })
             .map((m, i) => (
               <motion.div
-                key={i}
+                key={m.userId._id || i}
                 initial={{ opacity: 0, y: 25 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.05 }}

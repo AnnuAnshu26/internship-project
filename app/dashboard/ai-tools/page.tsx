@@ -4,9 +4,12 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { Sparkles, SendHorizonal } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
+
+// ✅ Always use a single, clean API base
+const API_BASE = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "http://localhost:5000";
+console.log("🌍 AI Tools API_BASE =", API_BASE);
 
 export default function AITools() {
   const [pitchInput, setPitchInput] = useState("");
@@ -21,29 +24,31 @@ export default function AITools() {
   ]);
   const [userInput, setUserInput] = useState("");
 
-  //  Generate Pitch
+  // ✅ Generate Pitch
   const generatePitch = async () => {
     if (!pitchInput.trim()) return toast.error("Enter some points first!");
 
     try {
       setLoading(true);
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ai/generate-pitch`, {
+      const res = await fetch(`${API_BASE}/api/ai/generate-pitch`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: pitchInput }),
       });
 
+      if (!res.ok) throw new Error("Pitch generation failed");
       const data = await res.json();
-      setPitchResult(data.reply);
-      toast.success("Pitch generated!");
+      setPitchResult(data.reply || "No pitch generated.");
+      toast.success("Pitch generated successfully!");
     } catch (err) {
       toast.error("Error generating pitch");
+      console.error(err);
     } finally {
       setLoading(false);
     }
   };
 
-  // Chat bot message
+  // ✅ AI Chat Assistant
   const sendMessage = async () => {
     if (!userInput.trim()) return;
 
@@ -52,26 +57,32 @@ export default function AITools() {
     setUserInput("");
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ai/chat`, {
+      const res = await fetch(`${API_BASE}/api/ai/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: userInput }),
       });
 
+      if (!res.ok) throw new Error("Chat request failed");
       const data = await res.json();
       setMessages((m) => [...m, { from: "ai", text: data.reply }]);
-    } catch {
-      setMessages((m) => [...m, { from: "ai", text: "Error answering, try again!" }]);
+    } catch (err) {
+      setMessages((m) => [
+        ...m,
+        { from: "ai", text: "⚠️ I couldn’t process that. Please try again!" },
+      ]);
+      console.error("AI chat error:", err);
     }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#020617] via-[#0b0f26] to-[#1e1b4b] text-white p-6 flex flex-col">
-      <h1 className="text-3xl font-bold mb-6 text-center">⚡ AI-Powered Hackathon Tools</h1>
+      <h1 className="text-3xl font-bold mb-6 text-center">
+        ⚡ AI-Powered Hackathon Tools
+      </h1>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-
-        {/* Pitch Generator */}
+        {/* 🧠 Pitch Generator */}
         <Card className="bg-[#0f1231]/70 p-6 rounded-2xl border border-[#3b82f6]/20">
           <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
             <Sparkles className="text-purple-400" /> AI Pitch Generator
@@ -85,13 +96,13 @@ export default function AITools() {
 • Target audience..."
             value={pitchInput}
             onChange={(e) => setPitchInput(e.target.value)}
-            className="w-full bg-black/30 border border-gray-700 p-3 rounded-lg h-40"
+            className="w-full bg-black/30 border border-gray-700 p-3 rounded-lg h-40 outline-none"
           />
 
           <Button
             onClick={generatePitch}
             disabled={loading}
-            className="mt-4 w-full bg-gradient-to-r from-blue-500 to-purple-600"
+            className="mt-4 w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:opacity-90"
           >
             {loading ? "Generating..." : "Generate Pitch 🚀"}
           </Button>
@@ -103,7 +114,7 @@ export default function AITools() {
           )}
         </Card>
 
-        {/* AI Chatbot */}
+        {/* 💬 AI Chat Assistant */}
         <Card className="bg-[#0f1231]/70 p-6 rounded-2xl border border-[#3b82f6]/20 flex flex-col">
           <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
             <Sparkles className="text-purple-400" /> AI Assistant
@@ -113,8 +124,11 @@ export default function AITools() {
             {messages.map((msg, i) => (
               <motion.div
                 key={i}
-                className={`p-3 rounded-lg max-w-[75%] ${msg.from === "user" ? "ml-auto bg-blue-600" : "bg-black/40 border border-gray-700"
-                  }`}
+                className={`p-3 rounded-lg max-w-[75%] ${
+                  msg.from === "user"
+                    ? "ml-auto bg-blue-600"
+                    : "bg-black/40 border border-gray-700"
+                }`}
               >
                 {msg.text}
               </motion.div>
@@ -127,9 +141,9 @@ export default function AITools() {
               value={userInput}
               onChange={(e) => setUserInput(e.target.value)}
               placeholder="Ask anything..."
-              className="flex-1 bg-black/30 px-3 py-2 border border-gray-700 rounded-lg"
+              className="flex-1 bg-black/30 px-3 py-2 border border-gray-700 rounded-lg outline-none"
             />
-            <Button onClick={sendMessage} className="bg-purple-600 p-2">
+            <Button onClick={sendMessage} className="bg-purple-600 hover:bg-purple-700 p-2">
               <SendHorizonal />
             </Button>
           </div>

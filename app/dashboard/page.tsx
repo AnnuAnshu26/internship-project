@@ -5,6 +5,11 @@ import { motion } from "framer-motion";
 import { Plus, Users, Clock, File, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 
+// ✅ Safe base URL (removes trailing slash)
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "http://localhost:5000";
+console.log("📊 Dashboard API_BASE =", API_BASE);
+
 export default function DashboardPage() {
   const [team, setTeam] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -21,7 +26,7 @@ export default function DashboardPage() {
         const token = localStorage.getItem("token");
         if (!token) return toast.error("Please log in to continue.");
 
-        const res = await fetch("${process.env.NEXT_PUBLIC_API_URL}/api/team/me", {
+        const res = await fetch(`${API_BASE}/api/team/me`, {
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
@@ -33,6 +38,7 @@ export default function DashboardPage() {
 
         setTeam(data.team);
       } catch (err: any) {
+        console.error("❌ Error fetching team:", err);
         toast.error(err.message);
       } finally {
         setLoading(false);
@@ -49,7 +55,7 @@ export default function DashboardPage() {
 
       try {
         const token = localStorage.getItem("token");
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/tasks/${team._id}`, {
+        const res = await fetch(`${API_BASE}/api/tasks/${team._id}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -57,6 +63,7 @@ export default function DashboardPage() {
         if (!res.ok) throw new Error(data.message || "Failed to load tasks.");
         setTasks(data.tasks);
       } catch (err: any) {
+        console.error("❌ Error fetching tasks:", err);
         toast.error(err.message);
       }
     };
@@ -67,10 +74,11 @@ export default function DashboardPage() {
   // ✅ Add new task
   const handleAddTask = async () => {
     if (!taskTitle.trim()) return toast.error("Task title required.");
+    if (!team?._id) return toast.error("Team not found.");
 
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch("${process.env.NEXT_PUBLIC_API_URL}/api/tasks", {
+      const res = await fetch(`${API_BASE}/api/tasks`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -94,6 +102,7 @@ export default function DashboardPage() {
       setAssignedTo("");
       toast.success("Task added successfully ✅");
     } catch (err: any) {
+      console.error("❌ Error adding task:", err);
       toast.error(err.message);
     }
   };
@@ -102,7 +111,7 @@ export default function DashboardPage() {
   const updateTaskStatus = async (taskId: string, newStatus: string) => {
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/tasks/${taskId}`, {
+      const res = await fetch(`${API_BASE}/api/tasks/${taskId}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -117,6 +126,7 @@ export default function DashboardPage() {
       setTasks(tasks.map((t) => (t._id === taskId ? data.task : t)));
       toast.success(`Task marked as ${newStatus}`);
     } catch (err: any) {
+      console.error("❌ Error updating task:", err);
       toast.error(err.message);
     }
   };

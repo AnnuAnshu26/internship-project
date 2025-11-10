@@ -9,11 +9,11 @@ import { cn } from "@/lib/utils";
 import Picker from "@emoji-mart/react";
 import data from "@emoji-mart/data";
 
-// ✅ Use Render URL from .env.local
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+// ✅ Safe base URL (handles both Render + Localhost)
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "http://localhost:5000";
 console.log("🌍 API_BASE =", API_BASE);
 
-// ✅ Define strong message type
 type MessageType = {
   senderName: string;
   from: "you" | "team";
@@ -28,7 +28,6 @@ export default function ChatPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
-  // ✅ Summary states
   const [summary, setSummary] = useState("");
   const [loadingSummary, setLoadingSummary] = useState(false);
 
@@ -38,7 +37,6 @@ export default function ChatPage() {
   // ✅ Generate AI chat summary
   const generateSummary = async () => {
     if (messages.length === 0) return;
-
     setLoadingSummary(true);
     try {
       const res = await fetch(`${API_BASE}/api/ai/summary`, {
@@ -56,7 +54,7 @@ export default function ChatPage() {
     }
   };
 
-  // ✅ Fetch old messages from backend
+  // ✅ Fetch chat history
   const fetchMessages = async () => {
     const token = localStorage.getItem("token");
     const team = localStorage.getItem("teamId");
@@ -66,22 +64,21 @@ export default function ChatPage() {
       const res = await fetch(`${API_BASE}/api/chat/${team}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-
       const data = await res.json();
+
       if (data.messages) {
         const formatted: MessageType[] = [];
-
         for (let m of data.messages) {
           const key = makeMsgKey(m.senderName, m.text);
           if (recentMessages.current.has(key)) continue;
-
           recentMessages.current.add(key);
           formatted.push({
             senderName: m.senderName,
             text: m.text,
-            from: (m.senderName === localStorage.getItem("userName")
-              ? "you"
-              : "team") as "you" | "team",
+            from:
+              m.senderName === localStorage.getItem("userName")
+                ? "you"
+                : "team",
           });
         }
         setMessages(formatted);
@@ -91,47 +88,44 @@ export default function ChatPage() {
     }
   };
 
-  // ✅ Setup WebSocket
+  // ✅ Setup WebSocket (Render + Local)
   useEffect(() => {
     const newSocket = io(API_BASE, {
       transports: ["websocket", "polling"],
+      secure: API_BASE.startsWith("https"),
     });
 
     setSocket(newSocket);
-
     newSocket.on("connect", () => console.log("🟢 Connected:", newSocket.id));
 
-    newSocket.off("receive_message").on("receive_message", (msg: any) => {
+    newSocket.on("receive_message", (msg: any) => {
       const key = makeMsgKey(msg.senderName, msg.text);
       if (recentMessages.current.has(key)) return;
-
       recentMessages.current.add(key);
-
       setMessages((prev) => [
         ...prev,
         {
           senderName: msg.senderName,
           text: msg.text,
-          from: (msg.senderName === localStorage.getItem("userName")
-            ? "you"
-            : "team") as "you" | "team",
+          from:
+            msg.senderName === localStorage.getItem("userName")
+              ? "you"
+              : "team",
         },
       ]);
     });
 
     return () => {
-      newSocket.off("receive_message");
       newSocket.disconnect();
     };
   }, []);
 
-  // ✅ Load team ID from localStorage
+  // ✅ Load teamId and join room
   useEffect(() => {
     const stored = localStorage.getItem("teamId");
     if (stored) setTeamId(stored);
   }, []);
 
-  // ✅ Join team room
   useEffect(() => {
     if (!socket || !teamId) return;
     socket.emit("join_team", teamId);
@@ -147,14 +141,10 @@ export default function ChatPage() {
 
     if (!recentMessages.current.has(key)) {
       recentMessages.current.add(key);
-      setMessages((prev) => [
-        ...prev,
-        { senderName, text: input, from: "you" },
-      ]);
+      setMessages((prev) => [...prev, { senderName, text: input, from: "you" }]);
     }
 
     const token = localStorage.getItem("token");
-
     await fetch(`${API_BASE}/api/chat/${teamId}`, {
       method: "POST",
       headers: {
@@ -193,7 +183,6 @@ export default function ChatPage() {
     <div className="h-[100dvh] w-full flex flex-col bg-gradient-to-br from-[#020617] via-[#0b0f26] to-[#1e1b4b] text-white p-6">
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-2xl font-bold">Team Chat</h1>
-
         <Button
           onClick={generateSummary}
           disabled={loadingSummary}
@@ -240,7 +229,12 @@ export default function ChatPage() {
         <button onClick={() => fileInputRef.current?.click()}>
           <FileUp className="w-6 h-6 text-gray-300 hover:text-purple-400" />
         </button>
-        <input type="file" ref={fileInputRef} className="hidden" onChange={sendFile} />
+        <input
+          type="file"
+          ref={fileInputRef}
+          className="hidden"
+          onChange={sendFile}
+        />
 
         <div className="relative">
           <button onClick={() => setShowEmojiPicker(!showEmojiPicker)}>
@@ -250,7 +244,9 @@ export default function ChatPage() {
             <div className="absolute bottom-12">
               <Picker
                 data={data}
-                onEmojiSelect={(e: any) => setInput((prev) => prev + e.native)}
+                onEmojiSelect={(e: any) =>
+                  setInput((prev) => prev + e.native)
+                }
                 theme="dark"
               />
             </div>
@@ -264,7 +260,10 @@ export default function ChatPage() {
           placeholder="Type a message..."
         />
 
-        <Button onClick={sendMessage} className="bg-purple-700 hover:bg-purple-500">
+        <Button
+          onClick={sendMessage}
+          className="bg-purple-700 hover:bg-purple-500"
+        >
           <Send className="w-5 h-5" />
         </Button>
       </div>

@@ -13,8 +13,10 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// ✅ Use backend API (Render / Local)
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+// ✅ Safe backend URL (no trailing slash issue)
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "http://localhost:5000";
+console.log("🔔 Notifications API_BASE =", API_BASE);
 
 type NotificationItem = {
   _id: string;
@@ -51,7 +53,7 @@ export default function NotificationsPage() {
   const token =
     typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
-  // ✅ Fetch notifications from backend
+  // ✅ Fetch notifications
   const fetchNotifications = async () => {
     if (!teamId || !token) return;
     setLoading(true);
@@ -60,10 +62,13 @@ export default function NotificationsPage() {
       const res = await fetch(`${API_BASE}/api/notifications/${teamId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+
+      if (!res.ok) throw new Error("Failed to fetch notifications");
+
       const data = await res.json();
       setItems(data.notifications || []);
     } catch (err) {
-      console.error("Error fetching notifications:", err);
+      console.error("❌ Error fetching notifications:", err);
     } finally {
       setLoading(false);
     }
@@ -73,11 +78,11 @@ export default function NotificationsPage() {
     fetchNotifications();
   }, []);
 
-  // ✅ Mark all as read (backend + local state)
+  // ✅ Mark all as read
   const markAllRead = async () => {
     if (!teamId || !token) return;
     try {
-      await fetch(`${API_BASE}/api/notifications/mark-read`, {
+      const res = await fetch(`${API_BASE}/api/notifications/mark-read`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -86,9 +91,11 @@ export default function NotificationsPage() {
         body: JSON.stringify({ teamId }),
       });
 
+      if (!res.ok) throw new Error("Failed to mark all read");
+
       setItems((prev) => prev.map((it) => ({ ...it, read: true })));
     } catch (err) {
-      console.error("Error marking notifications:", err);
+      console.error("❌ Error marking notifications:", err);
     }
   };
 
@@ -97,7 +104,7 @@ export default function NotificationsPage() {
     setItems((prev) => prev.filter((it) => it._id !== id));
   };
 
-  // ✅ Mark single as read
+  // ✅ Mark single as read (local only)
   const toggleRead = (id: string) => {
     setItems((prev) =>
       prev.map((it) => (it._id === id ? { ...it, read: true } : it))
