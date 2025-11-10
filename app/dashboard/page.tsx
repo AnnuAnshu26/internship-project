@@ -21,7 +21,7 @@ export default function DashboardPage() {
         const token = localStorage.getItem("token");
         if (!token) return toast.error("Please log in to continue.");
 
-        const res = await fetch("http://localhost:5000/api/team/me", {
+        const res = await fetch("${process.env.NEXT_PUBLIC_API_URL}/api/team/me", {
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
@@ -49,7 +49,7 @@ export default function DashboardPage() {
 
       try {
         const token = localStorage.getItem("token");
-        const res = await fetch(`http://localhost:5000/api/tasks/${team._id}`, {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/tasks/${team._id}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -70,7 +70,7 @@ export default function DashboardPage() {
 
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch("http://localhost:5000/api/tasks", {
+      const res = await fetch("${process.env.NEXT_PUBLIC_API_URL}/api/tasks", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -102,7 +102,7 @@ export default function DashboardPage() {
   const updateTaskStatus = async (taskId: string, newStatus: string) => {
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`http://localhost:5000/api/tasks/${taskId}`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/tasks/${taskId}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
