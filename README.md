@@ -1,6 +1,6 @@
 # Teamify.AI  
 **AI Powered Hackathon & Team Collaboration Platform**  
-> **Status: Ongoing Development**
+> **Status: Development Completed**
 
 ---
 
@@ -57,7 +57,7 @@ It helps teams form, communicate, generate AI-powered pitch content, track deadl
 ---
 
 ### Project Status  
-![Ongoing](https://img.shields.io/badge/Project-Ongoing-yellow?style=for-the-badge)  
+![Completed](https://img.shields.io/badge/Project-Completed-brightgreen?style=for-the-badge)
 ---
 
 **Teamify.AI - Build faster. Collaborate smarter.**
